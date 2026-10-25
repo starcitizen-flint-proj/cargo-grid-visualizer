@@ -1,0 +1,9 @@
+# uv 项目级配置。
+# 注意：以下两项均为「本机网络环境」相关设置，接入 CI 或与他人协作前
+# 应复核（例如 CI 在境外时改回官方源）。
+
+# 直连 GitHub 下载 python-build-standalone 基本不可用（实测约 0 B/s）
+python-install-mirror = "https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone"
+
+# 直连 PyPI 仅约 5 KB/s，故使用国内镜像
+index-url = "https://mirrors.aliyun.com/pypi/simple/"

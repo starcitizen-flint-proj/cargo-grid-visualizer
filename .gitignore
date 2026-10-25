@@ -1,0 +1,18 @@
+# venv（WSL2 侧用 .venv，Windows 侧用 .venv_win）
+.venv*/
+.python-version
+
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# 本地导出 / 临时截图
+out/
+*.tmp
+_*.png
+
+# 覆盖率产物
+.coverage
+coverage.xml
