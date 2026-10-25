@@ -336,7 +336,7 @@
   }
 
   // 左上角统计卡片的排版常量（isoSheet 和绘制共用，避免两处数字不一致）
-  var STATS = { padX: 20, padY: 18, head: 58, rowH: 32, foot: 44, sw: 22, w: 268 };
+  var STATS = { padX: 22, padY: 20, head: 64, rowH: 36, foot: 48, sw: 24, w: 292 };
 
   function statsHeight(rows) {
     return STATS.head + rows * STATS.rowH + STATS.foot;
@@ -363,8 +363,8 @@
       sw: 1,
       rx: 8,
     });
-    ops.text(x + STATS.padX, y + STATS.padY + 20, "货箱统计", {
-      size: 22,
+    ops.text(x + STATS.padX, y + STATS.padY + 22, "货箱统计", {
+      size: 24,
       weight: 700,
       fill: th.sheet.ink,
     });
@@ -377,20 +377,25 @@
         stroke: th.sheet.boxStroke,
         sw: 1,
       });
-      ops.text(x + STATS.padX + STATS.sw + 12, ry + 20, scu + " SCU", {
-        size: 19,
+      ops.text(x + STATS.padX + STATS.sw + 14, ry + 22, scu + " SCU", {
+        size: 22,
         fill: th.sheet.ink,
       });
-      ops.text(x + STATS.w - STATS.padX, ry + 20, "× " + counts[scu], {
-        size: 19,
+      ops.text(x + STATS.w - STATS.padX, ry + 22, "× " + counts[scu], {
+        size: 22,
         weight: 700,
         anchor: "end",
         fill: th.sheet.ink,
       });
     });
 
-    ops.text(x + STATS.padX, y + h - STATS.padY, "共 " + t.crates + " 件 · " + t.scu + " SCU", {
-      size: 16,
+    var sepY = y + STATS.head + rows.length * STATS.rowH + 6;
+    ops.line(x + STATS.padX, sepY, x + STATS.w - STATS.padX, sepY, {
+      stroke: th.sheet.floorEdge,
+      sw: 1,
+    });
+    ops.text(x + STATS.padX, sepY + 22, "共 " + t.crates + " 件 · " + t.scu + " SCU", {
+      size: 18,
       fill: th.sheet.muted,
     });
   }
