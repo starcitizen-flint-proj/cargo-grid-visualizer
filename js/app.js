@@ -448,15 +448,11 @@
 
   function cellFromEvent(ev) {
     if (!view) return null;
-    var canvas = el("editor");
-    var rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    // 画布内部是 dpr 倍，CSS 尺寸是 1 倍，换算回 CSS 像素再减原点
-    var dpr = canvas.width / rect.width || 1;
-    var sx = (ev.clientX - rect.left) * dpr;
-    var sy = (ev.clientY - rect.top) * dpr;
-    var cx = Math.floor((sx - view.x0) / view.cell);
-    var cy = Math.floor((sy - view.y0) / view.cell);
+    var rect = el("editor").getBoundingClientRect();
+    var q = R.cellAtPoint(view, rect.width, rect.height, ev.clientX - rect.left, ev.clientY - rect.top);
+    if (!q) return null;
+    var cx = Math.floor(q.fx);
+    var cy = Math.floor(q.fy);
     if (cx < 0 || cy < 0 || cx >= state.model.dims[0] || cy >= state.model.dims[1]) return null;
     return { x: cx, y: cy };
   }

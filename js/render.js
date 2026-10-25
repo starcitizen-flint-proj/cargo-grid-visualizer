@@ -840,6 +840,21 @@
 
   // ------------------------------------------------------------ 编辑画布
 
+  /**
+   * 鼠标位置 → 网格浮点坐标。
+   *
+   * view 里的 x0 / y0 / cell 是图元坐标（= CSS 像素），而 canvas.width 被设成
+   * 「图元宽 × devicePixelRatio」。所以换算只能用「图元宽 / 元素显示宽」，
+   * 乘 dpr 会把位置整体放大，越往右下偏得越多（高 DPI 下直接飞出网格）。
+   *
+   * px / py 是相对画布左上角的 CSS 像素，dw / dh 是元素显示尺寸。
+   * 返回的坐标可能为负或越界，由调用方 floor + 判边界。
+   */
+  function cellAtPoint(view, dw, dh, px, py) {
+    if (!view || !dw || !dh) return null;
+    return { fx: (px * (view.w / dw) - view.x0) / view.cell, fy: (py * (view.h / dh) - view.y0) / view.cell };
+  }
+
   function editorSheet(model, view) {
     var th = theme();
     var ops = new Ops();
@@ -964,7 +979,7 @@
       }
     }
 
-    return { width: W, height: H, ops: ops, view: { x0: x0, y0: y0, cell: cell } };
+    return { width: W, height: H, ops: ops, view: { x0: x0, y0: y0, cell: cell, w: W, h: H } };
   }
 
   global.CGV_RENDER = {
@@ -975,6 +990,7 @@
     orthoSheet: orthoSheet,
     layersSheet: layersSheet,
     editorSheet: editorSheet,
+    cellAtPoint: cellAtPoint,
     summaryLine: summaryLine,
     totalsOf: totalsOf,
     countsOf: countsOf,

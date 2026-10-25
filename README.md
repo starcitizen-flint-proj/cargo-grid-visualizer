@@ -104,11 +104,17 @@ python3 tools/gen_ships.py --src <ships.json> --out <输出路径>
 ## 测试
 
 ```bash
-python3 -m unittest -v        # tools/gen_ships.py 的解析规则
+.venv/bin/pytest               # tools/gen_ships.py 的解析规则（覆盖率门槛 70%）
+node tests/js/test_geometry.js # 前端坐标换算 + 摆放规则 + 出图
 ```
 
-前端没有自动化测试，逻辑改动后建议按下面的自查清单过一遍：
+前端是零依赖的普通 script，所以 `tests/js/` 用 node 直接跑，不引入测试框架。
+它守住两个曾经踩过的坑：画布坐标换算把 `devicePixelRatio` 乘进去（高 DPI 屏上
+预览偏向右下、严重时直接飞出网格），以及 SVG 的 `font-family` 引号嵌套。
 
+界面本身没有自动化测试，改动后建议按下面的自查清单过一遍：
+
+0. 把系统缩放调到 125% / 150% 再看一遍 —— 鼠标落点和货箱预览必须严格对齐；
 1. 选 `RSI Zeus Mk II CL` → `Cargo_Main`，显示 5×8×3 = 120 SCU，32 SCU 可用；
 2. 在 z=0 放两个 32 SCU（2×2×8，占满 x=0..3），切到 z=1 应显示为淡色虚线；
 3. 在 z=2 用 4 SCU 铺满，统计应到 120/120、22 件（与 cargo-pack 的最优解一致）；
