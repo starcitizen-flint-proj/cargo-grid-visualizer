@@ -407,9 +407,7 @@
       width: w,
       pad: 14,
       gap: 0,
-      headerLines: [],
-      legend: false,
-      labels: false,
+      stats: false, // 预览太小，统计卡片会挤掉模型
     });
     R.paintCanvas(el("preview"), sheet, T.sheet.bg, window.devicePixelRatio || 1);
   }
@@ -783,7 +781,8 @@
           : state.model.name
         : state.model.name;
     var headerLines = [title, R.summaryLine(models)];
-    if (kind === "iso") return R.isoSheet(models, { width: 1600, headerLines: headerLines });
+    // 等距图只保留左上角的货箱统计，不画标题 / 网格名 / 图例
+    if (kind === "iso") return R.isoSheet(models, { width: 1600 });
     if (kind === "ortho") return R.orthoSheet(models, { headerLines: headerLines });
     headerLines.push(
       "按 z 从下往上逐层摆放；淡色虚线 = 下层箱子的上半截，这一层不能再放东西。编号对应的坐标见下方清单。"

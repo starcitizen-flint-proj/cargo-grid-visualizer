@@ -126,5 +126,19 @@ eq(round.toJSON().length, 2, "JSON 导出");
   ok(svg.indexOf('font-family=""') < 0, pair[0] + " 属性引号没有嵌套错误");
 });
 
+// ---------------------------------------------------------------- 等距图只有统计卡片
+
+const iso = R.isoSheet([round], { width: 800 });
+const isoSvg = R.toSVG(iso, "#ffffff");
+ok(isoSvg.indexOf("货箱统计") >= 0, "等距图左上角有货箱统计");
+ok(isoSvg.indexOf("32 SCU") >= 0, "统计里有放过的尺寸");
+ok(isoSvg.indexOf("24 SCU") < 0, "没放过的尺寸不显示");
+ok(isoSvg.indexOf("SCU  ·") < 0, "不再输出「网格名 / 尺寸 / 件数」标注");
+ok(isoSvg.indexOf("图例") < 0, "不再输出底部图例");
+ok(isoSvg.indexOf(">r<") < 0, "不再输出标题");
+
+const isoEmpty = R.isoSheet([new M.GridModel({ name: "e", dims: [2, 2, 2], max: null })], { width: 400 });
+ok(R.toSVG(isoEmpty, "#ffffff").indexOf("货箱统计") < 0, "空网格不画统计卡片");
+
 console.log(failed ? "\n" + failed + " 项失败" : "\n全部通过");
 process.exit(failed ? 1 : 0);

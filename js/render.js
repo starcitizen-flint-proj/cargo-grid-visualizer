@@ -208,15 +208,30 @@
       ctx.save();
       if (o.opacity != null) ctx.globalAlpha = o.opacity;
       if (o.t === "rect") {
-        if (o.fill && o.fill !== "none") {
-          ctx.fillStyle = o.fill;
-          ctx.fillRect(o.x, o.y, o.w, o.h);
-        }
-        if (o.stroke && o.stroke !== "none") {
-          ctx.strokeStyle = o.stroke;
-          ctx.lineWidth = o.sw == null ? 1 : o.sw;
-          ctx.setLineDash(o.dash || []);
-          ctx.strokeRect(o.x, o.y, o.w, o.h);
+        if (o.rx && ctx.roundRect) {
+          ctx.beginPath();
+          ctx.roundRect(o.x, o.y, o.w, o.h, o.rx);
+          if (o.fill && o.fill !== "none") {
+            ctx.fillStyle = o.fill;
+            ctx.fill();
+          }
+          if (o.stroke && o.stroke !== "none") {
+            ctx.strokeStyle = o.stroke;
+            ctx.lineWidth = o.sw == null ? 1 : o.sw;
+            ctx.setLineDash(o.dash || []);
+            ctx.stroke();
+          }
+        } else {
+          if (o.fill && o.fill !== "none") {
+            ctx.fillStyle = o.fill;
+            ctx.fillRect(o.x, o.y, o.w, o.h);
+          }
+          if (o.stroke && o.stroke !== "none") {
+            ctx.strokeStyle = o.stroke;
+            ctx.lineWidth = o.sw == null ? 1 : o.sw;
+            ctx.setLineDash(o.dash || []);
+            ctx.strokeRect(o.x, o.y, o.w, o.h);
+          }
         }
       } else if (o.t === "poly") {
         ctx.beginPath();
@@ -320,6 +335,66 @@
     return cx;
   }
 
+  // 左上角统计卡片的排版常量（isoSheet 和绘制共用，避免两处数字不一致）
+  var STATS = { padX: 20, padY: 18, head: 58, rowH: 32, foot: 44, sw: 22, w: 268 };
+
+  function statsHeight(rows) {
+    return STATS.head + rows * STATS.rowH + STATS.foot;
+  }
+
+  /**
+   * 左上角的货箱统计：每个尺寸几件，没放的不显示。
+   * 这是等距图上唯一的文字，其余标注（网格名、图例、标题）一律不画。
+   */
+  function statsCard(ops, models, x, y) {
+    var th = theme();
+    var counts = countsOf(models);
+    var rows = LEGEND_ORDER.filter(function (scu) {
+      return (counts[scu] || 0) > 0;
+    });
+    if (!rows.length) return;
+    var t = totalsOf(models);
+    var h = statsHeight(rows.length);
+
+    ops.rect(x, y, STATS.w, h, {
+      fill: "#ffffff",
+      opacity: 0.92,
+      stroke: th.sheet.floorEdge,
+      sw: 1,
+      rx: 8,
+    });
+    ops.text(x + STATS.padX, y + STATS.padY + 20, "货箱统计", {
+      size: 22,
+      weight: 700,
+      fill: th.sheet.ink,
+    });
+
+    var top = y + STATS.head;
+    rows.forEach(function (scu, i) {
+      var ry = top + i * STATS.rowH;
+      ops.rect(x + STATS.padX, ry + 2, STATS.sw, STATS.sw, {
+        fill: colorOf(scu),
+        stroke: th.sheet.boxStroke,
+        sw: 1,
+      });
+      ops.text(x + STATS.padX + STATS.sw + 12, ry + 20, scu + " SCU", {
+        size: 19,
+        fill: th.sheet.ink,
+      });
+      ops.text(x + STATS.w - STATS.padX, ry + 20, "× " + counts[scu], {
+        size: 19,
+        weight: 700,
+        anchor: "end",
+        fill: th.sheet.ink,
+      });
+    });
+
+    ops.text(x + STATS.padX, y + h - STATS.padY, "共 " + t.crates + " 件 · " + t.scu + " SCU", {
+      size: 16,
+      fill: th.sheet.muted,
+    });
+  }
+
   // ------------------------------------------------------------ 等距图
 
   function isoPoint(x, y, z) {
@@ -334,9 +409,7 @@
         gap: 2,
         explode: 0,
         pad: 40,
-        headerLines: [],
-        legend: true,
-        labels: true,
+        stats: true,
       },
       opts
     );
@@ -376,13 +449,14 @@
       });
     });
 
-    var headerH = o.headerLines.length ? o.headerLines.length * 26 + 10 : 0;
-    var legendH = o.legend ? 62 : 0;
-    var labelH = o.labels ? 40 : 0;
+    var counts = countsOf(models);
+    var statRows = LEGEND_ORDER.filter(function (scu) {
+      return (counts[scu] || 0) > 0;
+    }).length;
+    var statsH = o.stats && statRows ? statsHeight(statRows) : 0;
+    var headerH = statsH ? statsH + 26 : 0;
     var scale = (o.width - 2 * o.pad) / Math.max(maxX - minX, 1e-6);
-    var height = Math.round(
-      (maxY - minY) * scale + headerH + 2 * o.pad + legendH + labelH
-    );
+    var height = Math.round((maxY - minY) * scale + headerH + 2 * o.pad);
 
     function tx(x, y, z) {
       var p = isoPoint(x, y, z);
@@ -390,13 +464,7 @@
     }
 
     ops.rect(0, 0, o.width, height, { fill: th.sheet.bg });
-    o.headerLines.forEach(function (line, i) {
-      ops.text(o.pad, 28 + i * 26, line, {
-        size: i === 0 ? 18 : 13,
-        weight: i === 0 ? 700 : 400,
-        fill: i === 0 ? th.sheet.ink : th.sheet.muted,
-      });
-    });
+    if (o.stats) statsCard(ops, models, o.pad, o.pad);
 
     // 地面 + 格线
     var showGrid = scale * COS30 >= 4;
@@ -469,45 +537,6 @@
       ops.poly(top, { fill: base, stroke: th.sheet.boxStroke, sw: sw });
     });
 
-    // 网格标签压在货箱之上，避免被挡住
-    if (o.labels) {
-      models.forEach(function (m, i) {
-        var ox = offsets[i];
-        // 取这个网格投影后的包围盒下沿，标签才不会压在箱子上
-        var nx0 = Infinity, nx1 = -Infinity, ny1 = -Infinity;
-        [ox, ox + m.dims[0]].forEach(function (x) {
-          [0, m.dims[1]].forEach(function (y) {
-            [0, m.dims[2] + o.explode * Math.max(0, m.dims[2] - 1)].forEach(function (z) {
-              var q = tx(x, y, z);
-              if (q[0] < nx0) nx0 = q[0];
-              if (q[0] > nx1) nx1 = q[0];
-              if (q[1] > ny1) ny1 = q[1];
-            });
-          });
-        });
-        var p = [(nx0 + nx1) / 2, ny1];
-        var label = m.name;
-        var sub = m.dims.join("×") + "  ·  " + m.crates.length + " 件";
-        var w = Math.max(label.length * 7.2, sub.length * 6.4) + 14;
-        ops.rect(p[0] - w / 2, p[1] + 8, w, 32, {
-          fill: th.sheet.labelBg,
-          opacity: th.sheet.labelBgOpacity,
-          rx: 4,
-        });
-        ops.text(p[0], p[1] + 22, label, {
-          size: 12,
-          fill: th.sheet.ink,
-          anchor: "middle",
-        });
-        ops.text(p[0], p[1] + 35, sub, {
-          size: 11,
-          fill: th.sheet.muted,
-          anchor: "middle",
-        });
-      });
-    }
-
-    if (o.legend) legendOps(ops, models, o.pad, height - legendH + 14);
     return { width: o.width, height: height, ops: ops };
   }
 
