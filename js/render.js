@@ -17,6 +17,15 @@
     '"DejaVu Sans", "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif';
   var MONO = '"DejaVu Sans Mono", Consolas, "Courier New", monospace';
 
+  // 导出图与编辑画布的字号倍率：只改这一个数就能整体缩放所有文字。
+  // 和文字相关的间距（行高、标签偏移、卡片尺寸）都跟着它走，
+  // 否则字变大之后会互相压住。
+  var FS = 1.5;
+
+  function px(n) {
+    return Math.round(n * FS * 10) / 10;
+  }
+
   function theme() {
     return global.CGV_THEME;
   }
@@ -73,6 +82,15 @@
     var g = parseInt(hex.slice(3, 5), 16);
     var b = parseInt(hex.slice(5, 7), 16);
     return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#1f2933" : "#ffffff";
+  }
+
+  /** 粗略估算文字宽度：中日韩按 1em，其它按 0.55em。只用来撑开画布。 */
+  function textWidth(str, size) {
+    var w = 0;
+    for (var i = 0; i < str.length; i++) {
+      w += str.charCodeAt(i) > 0x2e80 ? size : size * 0.55;
+    }
+    return w;
   }
 
   function esc(s) {
@@ -156,7 +174,7 @@
             attr("x", o.x) +
             attr("y", o.y) +
             ' font-size="' +
-            (o.size || 12) +
+            (o.size || px(12)) +
             '"' +
             " font-family='" +
             (o.family === "mono" ? MONO : SANS) +
@@ -260,7 +278,7 @@
         ctx.stroke();
       } else if (o.t === "text") {
         ctx.font =
-          (o.weight || 400) + " " + (o.size || 12) + "px " + (o.family === "mono" ? MONO : SANS);
+          (o.weight || 400) + " " + (o.size || px(12)) + "px " + (o.family === "mono" ? MONO : SANS);
         ctx.fillStyle = o.fill || theme().sheet.ink;
         ctx.textAlign = o.anchor === "middle" ? "center" : o.anchor === "end" ? "right" : "left";
         ctx.textBaseline = "alphabetic";
@@ -318,25 +336,34 @@
   function legendOps(ops, models, x, y, label) {
     var th = theme();
     var counts = countsOf(models);
-    ops.text(x, y, label || "图例", { size: 12, weight: 700, fill: th.sheet.ink });
+    ops.text(x, y, label || "图例", { size: px(12), weight: 700, fill: th.sheet.ink });
     var cx = x;
+    var sw = px(13);
     LEGEND_ORDER.forEach(function (scu) {
       var n = counts[scu] || 0;
       if (!n) return;
-      ops.rect(cx, y + 8, 13, 13, {
+      ops.rect(cx, y + px(8), sw, sw, {
         fill: colorOf(scu),
         stroke: th.sheet.boxStroke,
         sw: 0.7,
       });
       var s = scu + " × " + n;
-      ops.text(cx + 18, y + 19, s, { size: 11, fill: th.sheet.ink });
-      cx += 26 + s.length * 6.6;
+      ops.text(cx + sw + px(5), y + px(19), s, { size: px(11), fill: th.sheet.ink });
+      cx += sw + px(5) + s.length * px(6.6) + px(16);
     });
     return cx;
   }
 
   // 左上角统计卡片的排版常量（isoSheet 和绘制共用，避免两处数字不一致）
-  var STATS = { padX: 22, padY: 20, head: 64, rowH: 36, foot: 48, sw: 24, w: 292 };
+  var STATS = {
+    padX: px(22),
+    padY: px(20),
+    head: px(64),
+    rowH: px(36),
+    foot: px(48),
+    sw: px(24),
+    w: px(292),
+  };
 
   function statsHeight(rows) {
     return STATS.head + rows * STATS.rowH + STATS.foot;
@@ -361,10 +388,10 @@
       opacity: 0.92,
       stroke: th.sheet.floorEdge,
       sw: 1,
-      rx: 8,
+      rx: px(8),
     });
-    ops.text(x + STATS.padX, y + STATS.padY + 22, "货箱统计", {
-      size: 24,
+    ops.text(x + STATS.padX, y + STATS.padY + px(22), "货箱统计", {
+      size: px(24),
       weight: 700,
       fill: th.sheet.ink,
     });
@@ -372,30 +399,30 @@
     var top = y + STATS.head;
     rows.forEach(function (scu, i) {
       var ry = top + i * STATS.rowH;
-      ops.rect(x + STATS.padX, ry + 2, STATS.sw, STATS.sw, {
+      ops.rect(x + STATS.padX, ry + px(2), STATS.sw, STATS.sw, {
         fill: colorOf(scu),
         stroke: th.sheet.boxStroke,
         sw: 1,
       });
-      ops.text(x + STATS.padX + STATS.sw + 14, ry + 22, scu + " SCU", {
-        size: 22,
+      ops.text(x + STATS.padX + STATS.sw + px(14), ry + px(22), scu + " SCU", {
+        size: px(22),
         fill: th.sheet.ink,
       });
-      ops.text(x + STATS.w - STATS.padX, ry + 22, "× " + counts[scu], {
-        size: 22,
+      ops.text(x + STATS.w - STATS.padX, ry + px(22), "× " + counts[scu], {
+        size: px(22),
         weight: 700,
         anchor: "end",
         fill: th.sheet.ink,
       });
     });
 
-    var sepY = y + STATS.head + rows.length * STATS.rowH + 6;
+    var sepY = y + STATS.head + rows.length * STATS.rowH + px(6);
     ops.line(x + STATS.padX, sepY, x + STATS.w - STATS.padX, sepY, {
       stroke: th.sheet.floorEdge,
       sw: 1,
     });
-    ops.text(x + STATS.padX, sepY + 22, "共 " + t.crates + " 件 · " + t.scu + " SCU", {
-      size: 18,
+    ops.text(x + STATS.padX, sepY + px(22), "共 " + t.crates + " 件 · " + t.scu + " SCU", {
+      size: px(18),
       fill: th.sheet.muted,
     });
   }
@@ -459,7 +486,7 @@
       return (counts[scu] || 0) > 0;
     }).length;
     var statsH = o.stats && statRows ? statsHeight(statRows) : 0;
-    var headerH = statsH ? statsH + 26 : 0;
+    var headerH = statsH ? statsH + px(26) : 0;
     var scale = (o.width - 2 * o.pad) / Math.max(maxX - minX, 1e-6);
     var height = Math.round((maxY - minY) * scale + headerH + 2 * o.pad);
 
@@ -554,7 +581,7 @@
       cell = view.cell;
     var w = view.wCells * cell,
       h = view.hCells * cell;
-    ops.text(ox, oy - 5, view.title, { size: 10, weight: 700, fill: th.sheet.muted });
+    ops.text(ox, oy - px(5), view.title, { size: px(10), weight: 700, fill: th.sheet.muted });
     ops.rect(ox, oy, w, h, { fill: th.sheet.panel, stroke: th.sheet.floorEdge, sw: 0.8 });
     var g;
     for (g = 1; g < view.wCells; g++) {
@@ -598,7 +625,7 @@
 
   function orthoSheet(models, opts) {
     var th = theme();
-    var o = assign({ cell: 18, pad: 36, labelW: 210, gap: 34, headerLines: [] }, opts);
+    var o = assign({ cell: 18, pad: 36, labelW: px(210), gap: 34, headerLines: [] }, opts);
     var ops = new Ops();
     if (!models.length) return { width: 10, height: 10, ops: ops };
 
@@ -609,27 +636,33 @@
         Y = m.dims[1],
         Z = m.dims[2];
       maxRowW = Math.max(maxRowW, X * o.cell + o.gap + Y * o.cell + o.gap + X * o.cell);
-      rowHeights.push(Math.max(Z, Y) * o.cell + 30);
+      rowHeights.push(Math.max(Z, Y) * o.cell + px(30));
     });
-    var width = Math.round(o.pad * 2 + o.labelW + maxRowW + 20);
-
     var headerLines = o.headerLines.concat([
-      "F = 正视 (X-Z)    S = 侧视 (Y-Z)    T = 俯视 (X-Y)   —— 均为从外侧看的投影，只有最外层可见，内部结构见分层图",
+      "F = 正视 (X-Z)    S = 侧视 (Y-Z)    T = 俯视 (X-Y)",
+      "均为从外侧看的投影，只有最外层可见；内部结构见分层图",
     ]);
-    var top = o.pad + 26 * headerLines.length + 16;
+    var headerW = 0;
+    headerLines.forEach(function (line, i) {
+      headerW = Math.max(headerW, textWidth(line, i === 0 ? px(18) : px(12)));
+    });
+    var width = Math.round(
+      Math.max(o.pad * 2 + o.labelW + maxRowW + px(20), headerW + o.pad * 2)
+    );
+    var top = o.pad + px(26) * headerLines.length + px(16);
     var height = Math.round(
       top +
         rowHeights.reduce(function (a, b) {
           return a + b;
         }, 0) +
-        70 +
+        px(70) +
         o.pad
     );
 
     ops.rect(0, 0, width, height, { fill: th.sheet.bg });
     headerLines.forEach(function (line, i) {
-      ops.text(o.pad, 26 + i * 24, line, {
-        size: i === 0 ? 18 : 12,
+      ops.text(o.pad, px(26) + i * px(24), line, {
+        size: i === 0 ? px(18) : px(12),
         weight: i === 0 ? 700 : 400,
         fill: i === 0 ? th.sheet.ink : th.sheet.muted,
       });
@@ -638,13 +671,13 @@
     var y = top;
     models.forEach(function (m, i) {
       var crates = m.orderedCrates();
-      ops.text(o.pad, y + 16, m.name, {
-        size: 12,
+      ops.text(o.pad, y + px(16), m.name, {
+        size: px(12),
         weight: 700,
         fill: th.sheet.ink,
       });
-      ops.text(o.pad, y + 31, m.dims.join("×") + " · " + crates.length + " 件", {
-        size: 11,
+      ops.text(o.pad, y + px(31), m.dims.join("×") + " · " + crates.length + " 件", {
+        size: px(11),
         fill: th.sheet.muted,
       });
       var x = o.pad + o.labelW;
@@ -688,7 +721,7 @@
       y += rowHeights[i];
     });
 
-    legendOps(ops, models, o.pad, height - 56);
+    legendOps(ops, models, o.pad, height - px(56));
     return { width: width, height: height, ops: ops };
   }
 
@@ -718,27 +751,27 @@
 
   function drawTable(ops, crates, x0, y0, maxW) {
     var th = theme();
-    var colW = 336;
+    var colW = px(336);
     var fits = Math.max(1, Math.min(4, Math.floor(maxW / colW)));
     // 件数少的时候不要摊成 4 列，按「每列最多 28 行」决定列数
     var cols = Math.max(1, Math.min(fits, Math.ceil(crates.length / 28)));
     var maxRows = 40;
     var lines = crates.slice(0, cols * maxRows);
-    var rowH = 15;
+    var rowH = px(15);
     var rows = Math.ceil(lines.length / cols);
     var left = Math.max(0, crates.length - lines.length);
 
     ops.text(
       x0,
-      y0 + 10,
+      y0 + px(10),
       "序号 / SCU / 占格(宽×高×长) / 层 / 左下角坐标 / 是否旋转 (rot=y 表示宽长互换)",
-      { size: 10.5, fill: th.sheet.faint }
+      { size: px(10.5), fill: th.sheet.faint }
     );
-    var y = y0 + 28;
+    var y = y0 + px(28);
     for (var c = 0; c < cols; c++) {
       var colX = x0 + c * colW;
       ops.text(colX, y, TABLE_HEADER, {
-        size: 11,
+        size: px(11),
         family: "mono",
         weight: 700,
         fill: th.sheet.ink,
@@ -747,19 +780,19 @@
         var idx = c * rows + r;
         if (idx >= lines.length) break;
         ops.text(colX, y + (r + 1) * rowH, clauseRow(lines[idx]), {
-          size: 11,
+          size: px(11),
           family: "mono",
           fill: th.sheet.ink,
         });
       }
     }
-    var bottom = y + rows * rowH + 6;
+    var bottom = y + rows * rowH + px(6);
     if (left > 0) {
       ops.text(x0, bottom, "… 另有 " + left + " 件未列出（件数过多，按上面的分层图摆放）", {
-        size: 10.5,
+        size: px(10.5),
         fill: th.sheet.faint,
       });
-      bottom += 16;
+      bottom += px(16);
     }
     return bottom;
   }
@@ -772,14 +805,14 @@
     var y = o.pad;
 
     o.headerLines.forEach(function (line, i) {
-      ops.text(o.pad, y + 20, line, {
-        size: i === 0 ? 18 : 12,
+      ops.text(o.pad, y + px(20), line, {
+        size: i === 0 ? px(18) : px(12),
         weight: i === 0 ? 700 : 400,
         fill: i === 0 ? th.sheet.ink : th.sheet.muted,
       });
-      y += i === 0 ? 26 : 20;
+      y += i === 0 ? px(26) : px(20);
     });
-    if (o.headerLines.length) y += 14;
+    if (o.headerLines.length) y += px(14);
 
     models.forEach(function (m) {
       var X = m.dims[0],
@@ -789,17 +822,19 @@
       var t = totalsOf([m]);
       var pct = t.cap ? Math.round((t.scu / t.cap) * 100) : 0;
 
-      ops.text(o.pad, y + 16, m.name, { size: 15, weight: 700, fill: th.sheet.ink });
-      ops.text(o.pad, y + 34, X + "×" + Y + "×" + Z + "  ·  " + t.cap + " SCU  ·  " + crates.length + " 件  ·  " + pct + "%", {
-        size: 11,
-        fill: th.sheet.muted,
-      });
-      y += 48;
+      ops.text(o.pad, y + px(16), m.name, { size: px(15), weight: 700, fill: th.sheet.ink });
+      ops.text(
+        o.pad,
+        y + px(34),
+        X + "×" + Y + "×" + Z + "  ·  " + t.cap + " SCU  ·  " + crates.length + " 件  ·  " + pct + "%",
+        { size: px(11), fill: th.sheet.muted }
+      );
+      y += px(48);
 
       var cell = Math.max(o.cellMin, Math.min(o.cellMax, Math.floor(560 / Math.max(X, Y))));
       var pw = X * cell,
         ph = Y * cell;
-      var rowH = ph + 30;
+      var rowH = ph + px(30);
       var gapX = 26;
       var x = o.pad;
 
@@ -808,8 +843,8 @@
           x = o.pad;
           y += rowH;
         }
-        var ptop = y + 16;
-        ops.text(x, y + 11, "z = " + z, { size: 11, weight: 700, fill: th.sheet.muted });
+        var ptop = y + px(16);
+        ops.text(x, y + px(11), "z = " + z, { size: px(11), weight: 700, fill: th.sheet.muted });
         ops.rect(x, ptop, pw, ph, {
           fill: th.sheet.panel,
           stroke: th.sheet.floorEdge,
@@ -843,9 +878,9 @@
             dash: upper ? [3, 2] : null,
           });
           var minSide = Math.min(rw, rh);
-          if (minSide >= 20 && cell >= 12) {
-            ops.text(rx + rw / 2, ry + rh / 2 + 4, String(c.no), {
-              size: Math.min(12, cell * 0.55),
+          if (minSide >= px(20) && cell >= 12) {
+            ops.text(rx + rw / 2, ry + rh / 2 + px(4), String(c.no), {
+              size: Math.min(px(12), cell * 0.55),
               fill: inkOn(colorOf(c.scu)),
               anchor: "middle",
               weight: 600,
@@ -854,15 +889,15 @@
         });
         x += pw + gapX;
       }
-      y += rowH + 10;
+      y += rowH + px(10);
 
       if (crates.length) {
         y = drawTable(ops, crates, o.pad, y, W - 2 * o.pad);
       } else {
-        ops.text(o.pad, y + 10, "（空）", { size: 11, fill: th.sheet.faint });
-        y += 20;
+        ops.text(o.pad, y + px(10), "（空）", { size: px(11), fill: th.sheet.faint });
+        y += px(20);
       }
-      y += 34;
+      y += px(34);
     });
 
     var height = Math.round(y + o.pad * 0.4);
@@ -940,7 +975,7 @@
       });
       if (Math.min(rw, rh) >= 22 && cell >= 16) {
         ops.text(rx + rw / 2, ry + rh / 2 + 4, String(c.scu), {
-          size: Math.min(13, cell * 0.5),
+          size: Math.min(px(13), cell * 0.5),
           fill: inkOn(base),
           anchor: "middle",
           weight: 600,
@@ -971,23 +1006,23 @@
     // 坐标刻度（格子够大才画）
     if (cell >= 22) {
       for (var ix = 0; ix < X; ix++) {
-        ops.text(x0 + (ix + 0.5) * cell, y0 - 6, String(ix), {
-          size: 10,
+        ops.text(x0 + (ix + 0.5) * cell, y0 - px(6), String(ix), {
+          size: px(10),
           fill: th.editor.ruler,
           anchor: "middle",
           family: "mono",
         });
       }
       for (var iy = 0; iy < Y; iy++) {
-        ops.text(x0 - 6, y0 + (iy + 0.5) * cell + 3.5, String(iy), {
-          size: 10,
+        ops.text(x0 - px(6), y0 + (iy + 0.5) * cell + px(3.5), String(iy), {
+          size: px(10),
           fill: th.editor.ruler,
           anchor: "end",
           family: "mono",
         });
       }
-      ops.text(x0 - 14, y0 - 12, "y↓", { size: 9, fill: th.editor.ruler });
-      ops.text(x0 + gw, y0 - 12, "x→", { size: 9, fill: th.editor.ruler, anchor: "end" });
+      ops.text(x0 - px(14), y0 - px(12), "y↓", { size: px(9), fill: th.editor.ruler });
+      ops.text(x0 + gw, y0 - px(12), "x→", { size: px(9), fill: th.editor.ruler, anchor: "end" });
     }
 
     // 幽灵预览
@@ -1005,7 +1040,7 @@
       });
       if (g.label) {
         ops.text(gx0 + (g.w * cell) / 2, gy0 + (g.l * cell) / 2 + 4, g.label, {
-          size: Math.min(12, cell * 0.5),
+          size: Math.min(px(12), cell * 0.5),
           fill: col,
           anchor: "middle",
           weight: 700,
