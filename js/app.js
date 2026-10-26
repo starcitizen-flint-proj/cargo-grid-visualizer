@@ -407,7 +407,7 @@
       width: w,
       pad: 14,
       gap: 0,
-      stats: false, // 预览太小，统计卡片会挤掉模型
+      stats: false, // 预览太小，图例会挤掉模型
     });
     R.paintCanvas(el("preview"), sheet, T.sheet.bg, window.devicePixelRatio || 1);
   }
@@ -781,7 +781,7 @@
           : state.model.name
         : state.model.name;
     var headerLines = [title, R.summaryLine(models)];
-    // 等距图只保留左上角的货箱统计，不画标题 / 网格名 / 图例
+    // 等距图只在底部画横向图例（放不下自动换行），不画标题 / 网格名
     if (kind === "iso") return R.isoSheet(models, { width: 1600 });
     if (kind === "ortho") return R.orthoSheet(models, { headerLines: headerLines });
     headerLines.push(

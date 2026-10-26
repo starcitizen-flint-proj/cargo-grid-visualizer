@@ -126,19 +126,52 @@ eq(round.toJSON().length, 2, "JSON 导出");
   ok(svg.indexOf('font-family=""') < 0, pair[0] + " 属性引号没有嵌套错误");
 });
 
-// ---------------------------------------------------------------- 等距图只有统计卡片
+// ---------------------------------------------------------------- 等距图底部图例
 
 const iso = R.isoSheet([round], { width: 800 });
 const isoSvg = R.toSVG(iso, "#ffffff");
-ok(isoSvg.indexOf("货箱统计") >= 0, "等距图左上角有货箱统计");
+ok(isoSvg.indexOf("货箱统计") >= 0, "等距图有货箱统计");
 ok(isoSvg.indexOf("32 SCU") >= 0, "统计里有放过的尺寸");
 ok(isoSvg.indexOf("24 SCU") < 0, "没放过的尺寸不显示");
 ok(isoSvg.indexOf("SCU  ·") < 0, "不再输出「网格名 / 尺寸 / 件数」标注");
-ok(isoSvg.indexOf("图例") < 0, "不再输出底部图例");
+ok(isoSvg.indexOf("图例") < 0, "不输出旧版底部图例");
 ok(isoSvg.indexOf(">r<") < 0, "不再输出标题");
 
+// 图例条目（标题 / 尺寸 / 合计）的基线 y 去重后就是行数
+function legendRows(sheet) {
+  const ys = new Set();
+  sheet.ops.items.forEach(function (o) {
+    if (o.t !== "text") return;
+    if (o.s === "货箱统计" || o.s.indexOf(" SCU × ") > 0 || o.s.indexOf("共 ") === 0) {
+      ys.add(o.y);
+    }
+  });
+  return ys.size;
+}
+
+const legendWide = R.isoSheet([round], { width: 1600 });
+eq(legendRows(legendWide), 1, "图例够宽时只有一行");
+
+const legendNarrow = R.isoSheet([round], { width: 460, pad: 20 });
+ok(legendRows(legendNarrow) > 1, "图例放不下时自动换行");
+
+const legendTexts = legendNarrow.ops.items.filter(function (o) {
+  return o.t === "text" && (o.s === "货箱统计" || o.s.indexOf(" SCU × ") > 0);
+});
+const legendY = legendTexts.map(function (o) {
+  return o.y;
+});
+ok(Math.min.apply(null, legendY) > legendNarrow.height / 2, "图例排在图的下方");
+ok(
+  legendTexts.every(function (o) {
+    return o.x < legendNarrow.width - 20;
+  }),
+  "换行后的图例不超出画布宽度"
+);
+ok(Math.max.apply(null, legendY) < legendNarrow.height - 20, "最后一行图例不超出画布底部");
+
 const isoEmpty = R.isoSheet([new M.GridModel({ name: "e", dims: [2, 2, 2], max: null })], { width: 400 });
-ok(R.toSVG(isoEmpty, "#ffffff").indexOf("货箱统计") < 0, "空网格不画统计卡片");
+ok(R.toSVG(isoEmpty, "#ffffff").indexOf("货箱统计") < 0, "空网格不画图例");
 
 console.log(failed ? "\n" + failed + " 项失败" : "\n全部通过");
 process.exit(failed ? 1 : 0);

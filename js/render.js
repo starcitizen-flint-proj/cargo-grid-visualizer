@@ -20,7 +20,7 @@
   // 导出图与编辑画布的字号倍率：只改这一个数就能整体缩放所有文字。
   // 和文字相关的间距（行高、标签偏移、卡片尺寸）都跟着它走，
   // 否则字变大之后会互相压住。
-  var FS = 1.5;
+  var FS = 3;
 
   function px(n) {
     return Math.round(n * FS * 10) / 10;
@@ -84,11 +84,11 @@
     return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#1f2933" : "#ffffff";
   }
 
-  /** 粗略估算文字宽度：中日韩按 1em，其它按 0.55em。只用来撑开画布。 */
+  /** 粗略估算文字宽度：中日韩按 1em，其它按 0.62em（DejaVu Sans 的数字/字母更宽）。 */
   function textWidth(str, size) {
     var w = 0;
     for (var i = 0; i < str.length; i++) {
-      w += str.charCodeAt(i) > 0x2e80 ? size : size * 0.55;
+      w += str.charCodeAt(i) > 0x2e80 ? size : size * 0.62;
     }
     return w;
   }
@@ -354,76 +354,83 @@
     return cx;
   }
 
-  // 左上角统计卡片的排版常量（isoSheet 和绘制共用，避免两处数字不一致）
-  var STATS = {
-    padX: px(22),
-    padY: px(20),
-    head: px(64),
-    rowH: px(36),
-    foot: px(48),
-    sw: px(24),
-    w: px(292),
+  // 底部横向图例的排版常量。图例按「色块 + 尺寸 + 件数」从左往右排，
+  // 一行放不下就自动换到下一行，行数决定图例区的高度。
+  var LEG = {
+    size: px(13),
+    sw: px(13),
+    swGap: px(6),
+    gap: px(8),
+    rowH: px(23),
   };
 
-  function statsHeight(rows) {
-    return STATS.head + rows * STATS.rowH + STATS.foot;
-  }
-
   /**
-   * 左上角的货箱统计：每个尺寸几件，没放的不显示。
-   * 这是等距图上唯一的文字，其余标注（网格名、图例、标题）一律不画。
+   * 先把图例排成行，只算尺寸不画图，供 isoSheet 提前撑高画布。
+   * 空网格返回 height 0，调用方据此跳过图例区。
    */
-  function statsCard(ops, models, x, y) {
+  function bottomLegendLayout(models, x0, maxX) {
     var th = theme();
     var counts = countsOf(models);
-    var rows = LEGEND_ORDER.filter(function (scu) {
+    var sizes = LEGEND_ORDER.filter(function (scu) {
       return (counts[scu] || 0) > 0;
     });
-    if (!rows.length) return;
+    if (!sizes.length) return { rows: [], height: 0 };
+
+    var entries = [{ text: "货箱统计", weight: 700, fill: th.sheet.ink }];
+    entries[0].w = textWidth(entries[0].text, LEG.size);
+    sizes.forEach(function (scu) {
+      var s = scu + " SCU × " + counts[scu];
+      entries.push({
+        scu: scu,
+        text: s,
+        fill: th.sheet.ink,
+        w: LEG.sw + LEG.swGap + textWidth(s, LEG.size) + px(2),
+      });
+    });
     var t = totalsOf(models);
-    var h = statsHeight(rows.length);
-
-    ops.rect(x, y, STATS.w, h, {
-      fill: "#ffffff",
-      opacity: 0.92,
-      stroke: th.sheet.floorEdge,
-      sw: 1,
-      rx: px(8),
-    });
-    ops.text(x + STATS.padX, y + STATS.padY + px(22), "货箱统计", {
-      size: px(24),
-      weight: 700,
-      fill: th.sheet.ink,
-    });
-
-    var top = y + STATS.head;
-    rows.forEach(function (scu, i) {
-      var ry = top + i * STATS.rowH;
-      ops.rect(x + STATS.padX, ry + px(2), STATS.sw, STATS.sw, {
-        fill: colorOf(scu),
-        stroke: th.sheet.boxStroke,
-        sw: 1,
-      });
-      ops.text(x + STATS.padX + STATS.sw + px(14), ry + px(22), scu + " SCU", {
-        size: px(22),
-        fill: th.sheet.ink,
-      });
-      ops.text(x + STATS.w - STATS.padX, ry + px(22), "× " + counts[scu], {
-        size: px(22),
-        weight: 700,
-        anchor: "end",
-        fill: th.sheet.ink,
-      });
-    });
-
-    var sepY = y + STATS.head + rows.length * STATS.rowH + px(6);
-    ops.line(x + STATS.padX, sepY, x + STATS.w - STATS.padX, sepY, {
-      stroke: th.sheet.floorEdge,
-      sw: 1,
-    });
-    ops.text(x + STATS.padX, sepY + px(22), "共 " + t.crates + " 件 · " + t.scu + " SCU", {
-      size: px(18),
+    var total = "共 " + t.crates + " 件 · " + t.scu + " SCU";
+    entries.push({
+      text: total,
       fill: th.sheet.muted,
+      w: textWidth(total, LEG.size) + px(2),
+    });
+
+    var rows = [[]];
+    var cx = x0;
+    entries.forEach(function (e) {
+      if (rows[rows.length - 1].length && cx + e.w > maxX) {
+        rows.push([]);
+        cx = x0;
+      }
+      rows[rows.length - 1].push({ e: e, x: cx });
+      cx += e.w + LEG.gap;
+    });
+
+    return { rows: rows, height: rows.length * LEG.rowH };
+  }
+
+  function drawBottomLegend(ops, layout, x0, y0) {
+    var th = theme();
+    var baseline = LEG.sw / 2 + LEG.size * 0.36;
+    layout.rows.forEach(function (row, i) {
+      var ry = y0 + i * LEG.rowH;
+      row.forEach(function (it) {
+        var e = it.e;
+        var tx = it.x;
+        if (e.scu) {
+          ops.rect(tx, ry, LEG.sw, LEG.sw, {
+            fill: colorOf(e.scu),
+            stroke: th.sheet.boxStroke,
+            sw: 1,
+          });
+          tx += LEG.sw + LEG.swGap;
+        }
+        ops.text(tx, ry + baseline, e.text, {
+          size: LEG.size,
+          weight: e.weight,
+          fill: e.fill,
+        });
+      });
     });
   }
 
@@ -481,22 +488,22 @@
       });
     });
 
-    var counts = countsOf(models);
-    var statRows = LEGEND_ORDER.filter(function (scu) {
-      return (counts[scu] || 0) > 0;
-    }).length;
-    var statsH = o.stats && statRows ? statsHeight(statRows) : 0;
-    var headerH = statsH ? statsH + px(26) : 0;
+    var legend = o.stats ? bottomLegendLayout(models, o.pad, o.width - o.pad) : { height: 0 };
+    var legendH = legend.height;
+    var legendGap = legendH ? px(14) : 0;
     var scale = (o.width - 2 * o.pad) / Math.max(maxX - minX, 1e-6);
-    var height = Math.round((maxY - minY) * scale + headerH + 2 * o.pad);
+    var bodyH = (maxY - minY) * scale;
+    var height = Math.round(bodyH + legendGap + legendH + 2 * o.pad);
 
     function tx(x, y, z) {
       var p = isoPoint(x, y, z);
-      return [o.pad + (p[0] - minX) * scale, headerH + o.pad + (p[1] - minY) * scale];
+      return [o.pad + (p[0] - minX) * scale, o.pad + (p[1] - minY) * scale];
     }
 
     ops.rect(0, 0, o.width, height, { fill: th.sheet.bg });
-    if (o.stats) statsCard(ops, models, o.pad, o.pad);
+    if (legendH) {
+      drawBottomLegend(ops, legend, o.pad, o.pad + bodyH + legendGap);
+    }
 
     // 地面 + 格线
     var showGrid = scale * COS30 >= 4;
@@ -1004,25 +1011,27 @@
     }
 
     // 坐标刻度（格子够大才画）
+    // 坐标刻度（格子够大才画）。这里的字号 / 偏移直接写死：
+    // 格子大小是画布 CSS 像素，不跟 FS 走，刻度数字跟着 FS 放大会和格子脱节。
     if (cell >= 22) {
       for (var ix = 0; ix < X; ix++) {
-        ops.text(x0 + (ix + 0.5) * cell, y0 - px(6), String(ix), {
-          size: px(10),
+        ops.text(x0 + (ix + 0.5) * cell, y0 - 6, String(ix), {
+          size: 14,
           fill: th.editor.ruler,
           anchor: "middle",
           family: "mono",
         });
       }
       for (var iy = 0; iy < Y; iy++) {
-        ops.text(x0 - px(6), y0 + (iy + 0.5) * cell + px(3.5), String(iy), {
-          size: px(10),
+        ops.text(x0 - 6, y0 + (iy + 0.5) * cell + 3.5, String(iy), {
+          size: 14,
           fill: th.editor.ruler,
           anchor: "end",
           family: "mono",
         });
       }
-      ops.text(x0 - px(14), y0 - px(12), "y↓", { size: px(9), fill: th.editor.ruler });
-      ops.text(x0 + gw, y0 - px(12), "x→", { size: px(9), fill: th.editor.ruler, anchor: "end" });
+      ops.text(x0 - 14, y0 - 12, "y↓", { size: 9, fill: th.editor.ruler });
+      ops.text(x0 + gw, y0 - 12, "x→", { size: 9, fill: th.editor.ruler, anchor: "end" });
     }
 
     // 幽灵预览
