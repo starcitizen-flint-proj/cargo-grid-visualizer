@@ -772,6 +772,13 @@
     });
   }
 
+  function isoExportOpts() {
+    return {
+      stats: !el("expNoLegend").checked,
+      transparent: el("expTransparent").checked,
+    };
+  }
+
   function sheetFor(kind, scope) {
     var models = scope === "ship" ? shipModels() : [state.model];
     var title =
@@ -782,7 +789,14 @@
         : state.model.name;
     var headerLines = [title, R.summaryLine(models)];
     // 等距图只在底部画横向图例（放不下自动换行），不画标题 / 网格名
-    if (kind === "iso") return R.isoSheet(models, { width: 1600 });
+    if (kind === "iso") {
+      var iso = isoExportOpts();
+      return R.isoSheet(models, {
+        width: 1600,
+        stats: iso.stats,
+        transparent: iso.transparent,
+      });
+    }
     if (kind === "ortho") return R.orthoSheet(models, { headerLines: headerLines });
     headerLines.push(
       "按 z 从下往上逐层摆放；淡色虚线 = 下层箱子的上半截，这一层不能再放东西。编号对应的坐标见下方清单。"
@@ -811,10 +825,11 @@
 
   function exportPNG(kind, scope) {
     var sheet = sheetFor(kind, scope);
+    var transparent = kind === "iso" && el("expTransparent").checked;
     var scale = 2;
     while (sheet.width * scale * sheet.height * scale > 110e6 && scale > 1) scale -= 0.5;
     var canvas = document.createElement("canvas");
-    R.paintCanvas(canvas, sheet, T.sheet.bg, scale);
+    R.paintCanvas(canvas, sheet, transparent ? null : T.sheet.bg, scale);
     canvas.toBlob(function (blob) {
       if (blob) download(blob, baseName(kind, scope) + ".png");
       else toast("PNG 生成失败，试试导出 SVG");
@@ -824,7 +839,8 @@
 
   function exportSVG(kind, scope) {
     var sheet = sheetFor(kind, scope);
-    var svg = R.toSVG(sheet, T.sheet.bg);
+    var transparent = kind === "iso" && el("expTransparent").checked;
+    var svg = R.toSVG(sheet, transparent ? null : T.sheet.bg);
     download(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), baseName(kind, scope) + ".svg");
     toast("已导出 SVG");
   }
@@ -873,7 +889,13 @@
     reader.readAsText(file);
   }
 
+  function syncIsoOpts() {
+    el("isoOpts").hidden = el("expKind").value !== "iso";
+  }
+
   function bindExport() {
+    el("expKind").addEventListener("change", syncIsoOpts);
+    syncIsoOpts();
     el("btnPNG").addEventListener("click", function () {
       exportPNG(el("expKind").value, el("expScope").value);
     });

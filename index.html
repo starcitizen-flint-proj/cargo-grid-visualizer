@@ -364,6 +364,29 @@
       .export-grid select {
         width: 100%;
       }
+      .iso-opts {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 6px;
+        font-size: 11px;
+        color: var(--textDim);
+      }
+      /* 作者样式里的 display 会盖掉 hidden，需要单独还原 */
+      .iso-opts[hidden] {
+        display: none;
+      }
+      .iso-opts label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .iso-opts input[type="checkbox"] {
+        margin: 0;
+        accent-color: var(--accent);
+      }
       .row2 {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -531,6 +554,10 @@
                 <option value="grid">当前网格</option>
                 <option value="ship">整船货舱</option>
               </select>
+            </div>
+            <div id="isoOpts" class="iso-opts" hidden>
+              <label><input id="expTransparent" type="checkbox" />透明背景</label>
+              <label><input id="expNoLegend" type="checkbox" />隐藏图例</label>
             </div>
             <div class="row2" style="margin-bottom: 6px">
               <button class="btn primary" id="btnPNG">PNG</button>

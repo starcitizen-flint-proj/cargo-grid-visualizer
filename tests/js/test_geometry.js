@@ -173,5 +173,44 @@ ok(Math.max.apply(null, legendY) < legendNarrow.height - 20, "最后一行图例
 const isoEmpty = R.isoSheet([new M.GridModel({ name: "e", dims: [2, 2, 2], max: null })], { width: 400 });
 ok(R.toSVG(isoEmpty, "#ffffff").indexOf("货箱统计") < 0, "空网格不画图例");
 
+// 导出选项：隐藏图例 / 透明背景
+const isoNoLegend = R.isoSheet([round], { width: 800, stats: false });
+ok(R.toSVG(isoNoLegend, "#ffffff").indexOf("货箱统计") < 0, "隐藏图例后不画货箱统计");
+ok(isoNoLegend.height < iso.height, "隐藏图例后画布变矮");
+
+const isoTransparent = R.isoSheet([round], { width: 800, transparent: true });
+ok(
+  R.toSVG(isoTransparent, null).indexOf('<rect width="100%" height="100%"') < 0,
+  "透明背景不画铺底矩形"
+);
+ok(
+  isoTransparent.ops.items.some(function (o) {
+    return o.t === "poly" && o.fill === globalThis.CGV_THEME.sheet.floor;
+  }),
+  "透明背景仍保留地面 / 格线"
+);
+
+// 透明背景 + 显示图例时，图例底下要有圆角底板
+function backdropRects(sheet) {
+  return sheet.ops.items.filter(function (o) {
+    return o.t === "rect" && o.rx === 20;
+  });
+}
+const backdrops = backdropRects(isoTransparent);
+eq(backdrops.length, 2, "透明背景 + 图例时画「填充 + 描边」两层底板");
+ok(backdrops[0] && backdrops[0].fill === "#ffffff" && backdrops[0].opacity === 0.75, "底板是 75% 白色");
+ok(
+  backdrops[1] &&
+    backdrops[1].stroke === globalThis.CGV_THEME.sheet.ink &&
+    backdrops[1].sw === 3,
+  "底板描边 3px 且与货箱统计同色"
+);
+eq(backdropRects(iso).length, 0, "不透明背景不画底板");
+eq(
+  backdropRects(R.isoSheet([round], { width: 800, transparent: true, stats: false })).length,
+  0,
+  "隐藏图例时不画底板"
+);
+
 console.log(failed ? "\n" + failed + " 项失败" : "\n全部通过");
 process.exit(failed ? 1 : 0);

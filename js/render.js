@@ -118,7 +118,8 @@
         SANS +
         "'>"
     );
-    out.push('<rect width="100%" height="100%" fill="' + bg + '"/>');
+    // bg 为空表示透明背景（等距图导出选项），不画铺底矩形
+    if (bg) out.push('<rect width="100%" height="100%" fill="' + bg + '"/>');
     sheet.ops.items.forEach(function (o) {
       if (o.t === "rect") {
         out.push(
@@ -218,8 +219,13 @@
     canvas.height = Math.max(1, Math.round(sheet.height * scale));
     var ctx = canvas.getContext("2d");
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, sheet.width, sheet.height);
+    if (bg) {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, sheet.width, sheet.height);
+    } else {
+      // 透明背景：新画布本身就是透明的，清一下兼容复用的情况
+      ctx.clearRect(0, 0, sheet.width, sheet.height);
+    }
     ctx.lineJoin = "round";
 
     sheet.ops.items.forEach(function (o) {
@@ -434,6 +440,31 @@
     });
   }
 
+  /**
+   * 透明背景时垫在图例后面的圆角底板。
+   * 尺寸按图例实际内容算：最右一条的右边缘 + 内边距，最后一行文字底部 + 内边距。
+   * 描边颜色跟「货箱统计」标题一致（th.sheet.ink）。
+   * 填充和描边拆成两个图元，Canvas 的 globalAlpha 才不会把描边也一起变透明。
+   */
+  function drawLegendBackdrop(ops, layout, x0, y0) {
+    var right = x0;
+    layout.rows.forEach(function (row) {
+      row.forEach(function (it) {
+        right = Math.max(right, it.x + it.e.w);
+      });
+    });
+    var contentH = (layout.rows.length - 1) * LEG.rowH + Math.max(LEG.sw, LEG.size * 1.15);
+    var padX = 16;
+    var padY = 12;
+    var x = x0 - padX;
+    var y = y0 - padY;
+    var w = right - x0 + padX * 2;
+    var h = contentH + padY * 2;
+    var radius = 20;
+    ops.rect(x, y, w, h, { rx: radius, fill: "#ffffff", opacity: 0.75 });
+    ops.rect(x, y, w, h, { rx: radius, stroke: theme().sheet.ink, sw: 3 });
+  }
+
   // ------------------------------------------------------------ 等距图
 
   function isoPoint(x, y, z) {
@@ -449,6 +480,7 @@
         explode: 0,
         pad: 40,
         stats: true,
+        transparent: false,
       },
       opts
     );
@@ -500,9 +532,13 @@
       return [o.pad + (p[0] - minX) * scale, o.pad + (p[1] - minY) * scale];
     }
 
-    ops.rect(0, 0, o.width, height, { fill: th.sheet.bg });
+    // 透明背景时不铺底色；地面和格线本身仍是不透明的
+    if (!o.transparent) ops.rect(0, 0, o.width, height, { fill: th.sheet.bg });
     if (legendH) {
-      drawBottomLegend(ops, legend, o.pad, o.pad + bodyH + legendGap);
+      var legendY = o.pad + bodyH + legendGap;
+      // 透明背景时给图例垫一块圆角底板，否则文字落在透明区域不好读
+      if (o.transparent) drawLegendBackdrop(ops, legend, o.pad, legendY);
+      drawBottomLegend(ops, legend, o.pad, legendY);
     }
 
     // 地面 + 格线
