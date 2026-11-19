@@ -1,1 +1,29 @@
-extend = "../ruff.toml"
+# cargo-grid-visualizer 的 ruff 配置。
+# 值来源于工作目录根部共享配置（sc-flint-proj/ruff.toml），但复制进来而非 extend：
+# 仓库已接入 CI，CI 里不存在上层目录的文件。
+
+line-length = 100
+target-version = "py314"
+
+# src/ 布局下，ruff 需要知道源码根目录才能正确判断 first-party import
+src = ["src", "tests"]
+
+[lint]
+select = [
+    "E4",  # import 相关
+    "E7",  # 语句层问题
+    "E9",  # 运行时错误（语法、未定义名等）
+    "F",   # pyflakes：未使用变量/导入、重复定义
+    "I",   # isort：import 排序
+    "UP",  # pyupgrade：现代语法
+    "B",   # flake8-bugbear：可疑写法
+    "SIM", # flake8-simplify：可简化的代码
+]
+
+[lint.isort]
+known-first-party = ["cargo_grid_visualizer", "tools"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
